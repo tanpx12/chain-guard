@@ -29,12 +29,14 @@
     "solhint": "^3.4.1",
     "solidity-coverage": "^0.7.22",
     "ts-node": "^10.9.1",
-    "typechain": "^5.2.0",
+    "typechain": "^8.1.0",
     "typescript": "^4.9.5"
   },
   "dependencies": {
+    "@chainlink/contracts": "^0.6.1",
     "@openzeppelin/contracts": "^4.8.2",
     "circomlib": "^2.0.5",
-    "circomlibjs": "^0.1.7"
+    "circomlibjs": "^0.1.7",
+    "ethereumjs-util": "^7.1.5"
   }
 }

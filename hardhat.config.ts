@@ -39,6 +39,18 @@ const config: HardhatUserConfig = {
         count: 20,
       },
     },
+    goerli: {
+      chainId: 5,
+      url: "https://goerli.blockpi.network/v1/rpc/public",
+      accounts: { mnemonic: mnemonic, count: 20 },
+      gas: 2100000,
+      gasPrice: 8000000000,
+    },
+    sepolia: {
+      chainId: 11155111,
+      url: "https://rpc.sepolia.org",
+      accounts: { mnemonic: mnemonic, count: 20 },
+    },
   },
   gasReporter: {
     enabled: true,
