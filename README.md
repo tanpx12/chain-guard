@@ -1,4 +1,4 @@
-# Account Abstraction 
+# ChainGuard - A Secure and Flexible Wallet for Self-Sovereign Identity and Digital Assets Using Account Abstraction
 
 Smart contract implementation of Account Abstraction.
 
