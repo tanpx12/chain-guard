@@ -287,8 +287,8 @@ export async function fillUserOp(
     if (op1.nonce == null) op1.nonce = 0;
     if (op1.sender == null) {
       if (initAddr.toLowerCase() === accountFactory.address.toLowerCase()) {
-        const salt = hexDataSlice(initCallData, 0, 32);
-        const ctr = hexDataSlice(initCallData, 32);
+        const salt = hexDataSlice(initCallData, 4, 16);
+        const ctr = hexDataSlice(initCallData, 16, 36);
         op1.sender = await getDeployedAddress(accountFactory, ctr, salt);
       } else {
         if (provider == null) throw new Error("no EntryPoint/Provider");

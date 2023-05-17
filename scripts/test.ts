@@ -1,6 +1,10 @@
 import { ethers } from "hardhat";
 import { Account__factory, ERC1967Proxy__factory } from "../typechain";
-import { createAccountOwner } from "../test/utils/testUtils";
+import {
+  createAccountOwner,
+  getAccountInitCode,
+} from "../test/utils/testUtils";
+import { hexConcat, keccak256 } from "ethers/lib/utils";
 async function main() {
   const accountOwner = createAccountOwner();
   const ep = await (await ethers.getContractFactory("EntryPoint")).deploy();
@@ -10,24 +14,21 @@ async function main() {
   const salt = "0x".padEnd(66, "0");
   console.log(await accountFactory.accountImplementation());
   console.log(await accountFactory.getAddress(accountOwner.address, salt));
-
-  const functionCallEncoded =
-    Account__factory.createInterface().encodeFunctionData("initialize", [
-      accountOwner.address,
-    ]);
-
-  const bytes = new ethers.utils.AbiCoder().encode(
-    ["address", "bytes"],
-    [await accountFactory.accountImplementation(), functionCallEncoded]
+  const initCode = accountFactory.interface.encodeFunctionData(
+    "createAccount",
+    [accountOwner.address, 0]
   );
-  const initCodeHash = ethers.utils.keccak256(
-    ethers.utils.solidityPack(
-      ["bytes", "bytes"],
-      [ERC1967Proxy__factory.bytecode, bytes]
-    )
-  );
+
   console.log(
-    ethers.utils.getCreate2Address(accountFactory.address, salt, initCodeHash)
+    "0x" +
+      keccak256(
+        hexConcat([
+          "0xff",
+          "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+          salt,
+          keccak256(initCode),
+        ])
+      ).slice(-40)
   );
 }
 

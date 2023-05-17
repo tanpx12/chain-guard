@@ -16,7 +16,6 @@ import "../utils/Exec.sol";
 import "./StakeManager.sol";
 import "./SenderCreator.sol";
 import "./Helpers.sol";
-import "hardhat/console.sol";
 
 contract EntryPoint is IEntryPoint, StakeManager {
     using UserOperationLib for UserOperation;

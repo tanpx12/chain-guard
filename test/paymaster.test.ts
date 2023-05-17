@@ -22,7 +22,7 @@ import {
   ETH_5,
   createAccountOwner,
   createAddress,
-  sendEth,
+  fund,
   userOpsWithoutAgg,
 } from "./utils/testUtils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -82,7 +82,7 @@ describe("Paymaster test", async () => {
       ethersSigner
     );
 
-    await sendEth(ethersSigner, accountOwner.address);
+    await fund(accountOwner.address, "5");
     await paymaster.connect(ethersSigner).addStake(1, { value: ETH_2 });
     await entryPoint.depositTo(paymaster.address, { value: ETH_1 });
   });

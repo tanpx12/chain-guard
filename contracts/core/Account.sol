@@ -27,6 +27,7 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
     //explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
+    address public guardianManger;
 
     IEntryPoint private immutable _entryPoint;
 
@@ -35,8 +36,15 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         address indexed owner
     );
 
+    event OwnerChanged(address indexed newOwner);
+
     modifier onlyOwner() {
         _onlyOwner();
+        _;
+    }
+
+    modifier onlyGuardianManager() {
+        _onlyGuardianManager();
         _;
     }
 
@@ -64,6 +72,17 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         );
     }
 
+    function _onlyGuardianManager() internal view {
+        require(
+            guardianManger != address(0),
+            "Account::_onlyGuardianManager: guardian not setup yet"
+        );
+        require(
+            msg.sender == guardianManger,
+            "Account::_onlyGuardianManager: only guardian manager"
+        );
+    }
+
     /**
      * execute a transaction (called directly from owner, or by entryPoint)
      */
@@ -84,7 +103,10 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         bytes[] calldata func
     ) external {
         _requireFromEntryPointOrOwner();
-        require(dest.length == func.length, "wrong array lengths");
+        require(
+            dest.length == func.length,
+            "Account:: executeBatch: wrong array lengths"
+        );
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, func[i]);
         }
@@ -170,5 +192,18 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
     ) internal view override {
         (newImplementation);
         _onlyOwner();
+    }
+
+    /**
+     *
+     * @param newOwner new owner of this account
+     */
+    function changeOwner(address newOwner) public override onlyGuardianManager {
+        require(
+            newOwner != owner && newOwner != address(0),
+            "Account:: changeOwner: invalid newOwner"
+        );
+        owner = newOwner;
+        emit OwnerChanged(newOwner);
     }
 }

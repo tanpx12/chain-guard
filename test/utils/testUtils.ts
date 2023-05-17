@@ -149,20 +149,6 @@ export async function createAccount(
   };
 }
 
-export async function sendEth(
-  signer: providers.JsonRpcSigner,
-  receiver: string
-): Promise<void> {
-  const tx = {
-    from: await signer.getAddress(),
-    to: receiver,
-    value: ETH_5,
-    gasLimit: ethers.utils.hexlify(100000),
-    gasPrice: 1e9,
-  };
-  await signer.sendTransaction(tx);
-}
-
 export function userOpsWithoutAgg(userOps: UserOperation[]) {
   return [
     {
