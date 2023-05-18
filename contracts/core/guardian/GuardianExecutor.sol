@@ -9,13 +9,13 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     uint256 private delay;
     uint256 private expirePeriod;
 
-    mapping(bytes32 => bool) transactionQueue;
+    mapping(bytes32 => bool) public transactionQueue;
 
     event TransactionQueued(
         bytes32 txHash,
         address indexed target,
         uint256 value,
-        bytes signature,
+        string signature,
         bytes data,
         uint256 eta
     );
@@ -24,7 +24,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         bytes32 txHash,
         address indexed target,
         uint256 value,
-        bytes signature,
+        string signature,
         bytes data,
         uint256 eta
     );
@@ -33,7 +33,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         bytes32 txHash,
         address indexed target,
         uint256 value,
-        bytes signature,
+        string signature,
         bytes data,
         uint256 eta
     );
@@ -60,7 +60,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     function queue(
         address _target,
         uint256 _value,
-        bytes calldata _signature,
+        string calldata _signature,
         bytes calldata _data,
         uint256 _eta
     ) external onlyOwner returns (bytes32) {
@@ -88,10 +88,10 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     function execute(
         address _target,
         uint256 _value,
-        bytes calldata _signature,
+        string calldata _signature,
         bytes calldata _data,
         uint256 _eta
-    ) external onlyOwner {
+    ) external payable onlyOwner {
         bytes32 txHash = keccak256(
             abi.encode(_target, _value, _signature, _data, _eta)
         );
@@ -140,7 +140,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     function cancel(
         address _target,
         uint256 _value,
-        bytes calldata _signature,
+        string calldata _signature,
         bytes calldata _data,
         uint256 _eta
     ) external onlyOwner {

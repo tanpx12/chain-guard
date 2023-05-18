@@ -28,7 +28,10 @@ contract GuardianManager is
     event ThresholdChanged(uint256 threshold);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "only owner");
+        require(
+            msg.sender == owner || msg.sender == address(account),
+            "only owner"
+        );
         _;
     }
 
