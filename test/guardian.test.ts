@@ -12,9 +12,10 @@ import {
   GuardianManager__factory,
 } from "../typechain";
 import { fillAndSign } from "./utils/UserOp";
-import { createAccountOwner, fund, userOpsWithoutAgg } from "./utils/testUtils";
+import { createAccountOwner, fund } from "./utils/testUtils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Wallet } from "ethers";
+import { BigNumberish, BytesLike, Wallet } from "ethers";
+import { before } from "mocha";
 
 describe("Guardian test", async () => {
   const ethersSigner = ethers.provider.getSigner();
@@ -29,8 +30,11 @@ describe("Guardian test", async () => {
   let guardian1: Wallet = createAccountOwner();
   let guardian2: Wallet = createAccountOwner();
   let guardian3: Wallet = createAccountOwner();
-  let txHash: string;
-  let eta = Math.floor((Date.now() + 10000) / 1000);
+  let guardian4: Wallet = createAccountOwner();
+
+  let txHash0: string;
+  let txHash1: string;
+
   before(async () => {
     let salt: string = "0x".padEnd(66, "0");
     signers = await ethers.getSigners();
@@ -61,7 +65,7 @@ describe("Guardian test", async () => {
   });
 
   it("Should initialize", async () => {
-    await guardianExecutor.initialize(account.address, 1, 100000);
+    await guardianExecutor.initialize(account.address, 0, 100000);
     await guardianManager.initialize(guardianExecutor.address, account.address);
     expect(await guardianManager.owner()).to.be.eq(accountOwner.address);
     expect(await guardianManager.account()).to.be.eq(account.address);
@@ -101,70 +105,307 @@ describe("Guardian test", async () => {
     expect(await guardianManager.guardians(guardian2.address)).to.be.true;
     expect(await guardianManager.guardians(guardian3.address)).to.be.true;
   });
+  describe("#guardian executor", async () => {
+    let setThresholdCalldata0: BytesLike;
+    let setThresholdCalldata1: BytesLike;
 
-  it("Should queue up transaction", async () => {
-    const setThresholdCalldata = await guardianManager.populateTransaction
-      .setThershold(3)
-      .then((tx) => tx.data!);
-    const queueCallData = await guardianExecutor.populateTransaction
-      .queue(guardianManager.address, 0, "", setThresholdCalldata, eta)
-      .then((tx) => tx.data!);
-    const queueCall = await account.populateTransaction
-      .execute(guardianExecutor.address, 0, queueCallData)
-      .then((tx) => tx.data!);
-    const userOp = await fillAndSign(
-      accountFactory,
-      {
-        sender: account.address,
-        callData: queueCall,
-      },
-      accountOwner,
-      entryPoint
-    );
-    await entryPoint
-      .connect(ethersSigner)
-      .handleOps([userOp], guardian1.address, {
-        gasLimit: 1000000,
-      });
+    let queueCalldata0: BytesLike;
+    let queueCalldata1: BytesLike;
 
-    const [log] = await guardianExecutor.queryFilter(
-      guardianExecutor.filters.TransactionQueued(),
-      await ethers.provider.getBlockNumber()
-    );
-    txHash = log.args.txHash;
-    expect(await guardianExecutor.transactionQueue(txHash)).to.be.true;
+    let queueCall0: BytesLike;
+    let queueCall1: BytesLike;
+    let eta: BigNumberish;
+
+    before(async () => {
+      eta = Math.floor((Date.now() + 7000) / 1000);
+      setThresholdCalldata0 = await guardianManager.populateTransaction
+        .setThershold(3)
+        .then((tx) => tx.data!);
+      setThresholdCalldata1 = await guardianManager.populateTransaction
+        .setThershold(1)
+        .then((tx) => tx.data!);
+
+      queueCalldata0 = await guardianExecutor.populateTransaction
+        .queue(guardianManager.address, 0, "", setThresholdCalldata0, eta)
+        .then((tx) => tx.data!);
+      queueCalldata1 = await guardianExecutor.populateTransaction
+        .queue(guardianManager.address, 0, "", setThresholdCalldata1, eta)
+        .then((tx) => tx.data!);
+
+      queueCall0 = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, queueCalldata0)
+        .then((tx) => tx.data!);
+      queueCall1 = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, queueCalldata1)
+        .then((tx) => tx.data!);
+    });
+
+    it("Should queue up transaction", async () => {
+      const userOp0 = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: queueCall0,
+        },
+        accountOwner,
+        entryPoint
+      );
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([userOp0], guardian1.address, {
+          gasLimit: 1000000,
+        });
+
+      const userOp1 = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: queueCall1,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([userOp1], guardian1.address, {
+          gasLimit: 1000000,
+        });
+
+      const [log0, log1] = await guardianExecutor.queryFilter(
+        guardianExecutor.filters.TransactionQueued()
+      );
+      txHash0 = log0.args.txHash;
+      txHash1 = log1.args.txHash;
+      expect(await guardianExecutor.transactionQueue(txHash0)).to.be.true;
+      expect(await guardianExecutor.transactionQueue(txHash1)).to.be.true;
+    });
+
+    it("Should execute transaction", async () => {
+      await new Promise((r) => setTimeout(r, 2000));
+      const execCalldata = await guardianExecutor.populateTransaction
+        .execute(guardianManager.address, 0, "", setThresholdCalldata0, eta)
+        .then((tx) => tx.data!);
+      const execCall = await account.populateTransaction
+        .execute(
+          guardianExecutor.address,
+          ethers.utils.parseEther("0.1"),
+          execCalldata,
+          { gasLimit: 1000000 }
+        )
+        .then((tx) => tx.data!);
+      const userOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: execCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([userOp], guardian1.address, { gasLimit: 1000000 });
+      expect(await guardianExecutor.transactionQueue(txHash0)).to.be.false;
+      expect(await guardianManager.threshold()).to.be.eq(3);
+    });
+
+    it("Should cancel transaction", async () => {
+      const cancelCalldata = await guardianExecutor.populateTransaction
+        .cancel(guardianManager.address, 0, "", setThresholdCalldata1, eta)
+        .then((tx) => tx.data!);
+      const cancelCall = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, cancelCalldata)
+        .then((tx) => tx.data!);
+      const userOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: cancelCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([userOp], guardian1.address, { gasLimit: 1000000 });
+      expect(await guardianExecutor.transactionQueue(txHash1)).to.be.false;
+    });
   });
 
-  it("Should execute transaction", async () => {
-    const setThresholdCalldata = await guardianManager.populateTransaction
-      .setThershold(3)
-      .then((tx) => tx.data!);
-    await new Promise((r) => setTimeout(r, 5000));
-    const execCalldata = await guardianExecutor.populateTransaction
-      .execute(guardianManager.address, 0, "", setThresholdCalldata, eta)
-      .then((tx) => tx.data!);
-    const execCall = await account.populateTransaction
-      .execute(
-        guardianExecutor.address,
-        ethers.utils.parseEther("0.1"),
-        execCalldata,
-        { gasLimit: 1000000 }
-      )
-      .then((tx) => tx.data!);
-    const userOp = await fillAndSign(
-      accountFactory,
-      {
-        sender: account.address,
-        callData: execCall,
-      },
-      accountOwner,
-      entryPoint
-    );
+  describe("#guardian manager", async () => {
+    let setThresholdCalldata: BytesLike;
+    let addGuardianCalldata: BytesLike;
+    let removeGuardianCalldata: BytesLike;
+    let eta: BigNumberish;
+    before(async () => {
+      setThresholdCalldata = await guardianManager.populateTransaction
+        .setThershold(1)
+        .then((tx) => tx.data!);
+      addGuardianCalldata = await guardianManager.populateTransaction
+        .addGuardian(guardian4.address)
+        .then((tx) => tx.data!);
+      removeGuardianCalldata = await guardianManager.populateTransaction
+        .removeGuardian(guardian3.address)
+        .then((tx) => tx.data!);
+    });
 
-    await entryPoint
-      .connect(ethersSigner)
-      .handleOps([userOp], guardian1.address, { gasLimit: 1000000 });
-    expect(await guardianExecutor.transactionQueue(txHash)).to.be.false;
-    expect(await guardianManager.threshold()).to.be.eq(3);
+    it("should set threshold", async () => {
+      eta = Math.floor((Date.now() + 10000) / 1000);
+      // console.log("initial threshold: ", await guardianManager.threshold());
+      // queue setThreshold() call
+      const queueCalldata = await guardianExecutor.populateTransaction
+        .queue(guardianManager.address, 0, "", setThresholdCalldata, eta)
+        .then((tx) => tx.data!);
+      const queueCall = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, queueCalldata)
+        .then((tx) => tx.data!);
+      const queueUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: queueCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
+
+      // execute setThreshold() call
+      await new Promise((r) => setTimeout(r, 2000));
+      const executeCalldata = await guardianExecutor.populateTransaction
+        .execute(guardianManager.address, 0, "", setThresholdCalldata, eta)
+        .then((tx) => tx.data!);
+      const executeCall = await account.populateTransaction
+        .execute(
+          guardianExecutor.address,
+          ethers.utils.parseEther("0.1"),
+          executeCalldata
+        )
+        .then((tx) => tx.data!);
+      const executeUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: executeCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([executeUserOp], guardian1.address, { gasLimit: 1000000 });
+      expect(await guardianManager.threshold()).to.be.eq(1);
+    });
+
+    it("should add guardian", async () => {
+      // queue addGuardian() call
+      eta = Math.floor((Date.now() + 10000) / 1000);
+      const queueCalldata = await guardianExecutor.populateTransaction
+        .queue(guardianManager.address, 0, "", addGuardianCalldata, eta)
+        .then((tx) => tx.data!);
+      const queueCall = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, queueCalldata)
+        .then((tx) => tx.data!);
+      const queueUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: queueCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
+
+      // execute addGuardian() call
+      await new Promise((r) => setTimeout(r, 2000));
+      const executeCalldata = await guardianExecutor.populateTransaction
+        .execute(guardianManager.address, 0, "", addGuardianCalldata, eta)
+        .then((tx) => tx.data!);
+      const executeCall = await account.populateTransaction
+        .execute(
+          guardianExecutor.address,
+          ethers.utils.parseEther("0.1"),
+          executeCalldata
+        )
+        .then((tx) => tx.data!);
+      const executeUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: executeCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([executeUserOp], guardian1.address, { gasLimit: 1000000 });
+      expect(await guardianManager.guardians(guardian4.address)).to.be.true;
+      expect(await guardianManager.guardianCount()).to.be.eq(4);
+    });
+    it("should remove guardian", async () => {
+      // queue removeGuardian() call
+      eta = Math.floor((Date.now() + 10000) / 1000);
+      const queueCalldata = await guardianExecutor.populateTransaction
+        .queue(guardianManager.address, 0, "", removeGuardianCalldata, eta)
+        .then((tx) => tx.data!);
+      const queueCall = await account.populateTransaction
+        .execute(guardianExecutor.address, 0, queueCalldata)
+        .then((tx) => tx.data!);
+      const queueUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: queueCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
+
+      // execute removeGuardian() call
+      await new Promise((r) => setTimeout(r, 2000));
+      const executeCalldata = await guardianExecutor.populateTransaction
+        .execute(guardianManager.address, 0, "", removeGuardianCalldata, eta)
+        .then((tx) => tx.data!);
+      const executeCall = await account.populateTransaction
+        .execute(
+          guardianExecutor.address,
+          ethers.utils.parseEther("0.1"),
+          executeCalldata
+        )
+        .then((tx) => tx.data!);
+      const executeUserOp = await fillAndSign(
+        accountFactory,
+        {
+          sender: account.address,
+          callData: executeCall,
+        },
+        accountOwner,
+        entryPoint
+      );
+
+      await entryPoint
+        .connect(ethersSigner)
+        .handleOps([executeUserOp], guardian1.address, { gasLimit: 1000000 });
+      expect(await guardianManager.guardians(guardian3.address)).to.be.false;
+      expect(await guardianManager.guardianCount()).to.be.eq(3);
+    });
+
+    // it("should verify multisig", async () => {});
+
+    // it("should change owner", async () => {});
   });
 });
