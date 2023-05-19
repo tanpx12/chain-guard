@@ -4,6 +4,10 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * A timelock contract for calling functions of the GuardianManager
+ * @notice
+ */
 contract GuardianExecutor is Initializable, UUPSUpgradeable {
     address public owner;
     uint256 private delay;
@@ -43,6 +47,12 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         _;
     }
 
+    /**
+     * Initialize parameter of GuardianExecutor contract
+     * @param _owner the owner of the account that this Guardian is protected
+     * @param _delay the time delay require for a transaction request to mature
+     * @param _expirePeriod the time period after eta that user could execute the transaction through GuardianExecutor
+     */
     function initialize(
         address _owner,
         uint256 _delay,
@@ -57,6 +67,14 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         return delay;
     }
 
+    /**
+     * Queue the transaction that owner wish to execute
+     * @param _target the target contract that going to be call
+     * @param _value the value of the call
+     * @param _signature the function signature
+     * @param _data calldata of the call
+     * @param _eta estimated time of arrival of this transaction
+     */
     function queue(
         address _target,
         uint256 _value,
@@ -85,6 +103,14 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         return txHash;
     }
 
+    /**
+     * Execution call of the queued transaction
+     * @param _target the target contract that going to be call
+     * @param _value the value of the call
+     * @param _signature the function signature
+     * @param _data calldata of the call
+     * @param _eta estimated time of arrival of this transaction
+     */
     function execute(
         address _target,
         uint256 _value,
@@ -137,6 +163,14 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
         );
     }
 
+    /**
+     * Cancel the queued transaction
+     * @param _target the target contract that going to be call
+     * @param _value the value of the call
+     * @param _signature the function signature
+     * @param _data calldata of the call
+     * @param _eta estimated time of arrival of this transaction
+     */
     function cancel(
         address _target,
         uint256 _value,

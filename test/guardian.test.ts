@@ -182,7 +182,7 @@ describe("Guardian test", async () => {
     });
 
     it("Should execute transaction", async () => {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
       const execCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", setThresholdCalldata0, eta)
         .then((tx) => tx.data!);
@@ -240,7 +240,7 @@ describe("Guardian test", async () => {
     let eta: BigNumberish;
     before(async () => {
       setThresholdCalldata = await guardianManager.populateTransaction
-        .setThershold(1)
+        .setThershold(2)
         .then((tx) => tx.data!);
       addGuardianCalldata = await guardianManager.populateTransaction
         .addGuardian(guardian4.address)
@@ -274,7 +274,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute setThreshold() call
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", setThresholdCalldata, eta)
         .then((tx) => tx.data!);
@@ -298,7 +298,7 @@ describe("Guardian test", async () => {
       await entryPoint
         .connect(ethersSigner)
         .handleOps([executeUserOp], guardian1.address, { gasLimit: 1000000 });
-      expect(await guardianManager.threshold()).to.be.eq(1);
+      expect(await guardianManager.threshold()).to.be.eq(2);
     });
 
     it("should add guardian", async () => {
@@ -325,7 +325,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute addGuardian() call
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", addGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -376,7 +376,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute removeGuardian() call
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", removeGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -404,8 +404,8 @@ describe("Guardian test", async () => {
       expect(await guardianManager.guardianCount()).to.be.eq(3);
     });
 
-    // it("should verify multisig", async () => {});
+    it("should verify multisig", async () => {});
 
-    // it("should change owner", async () => {});
+    it("should change owner", async () => {});
   });
 });
