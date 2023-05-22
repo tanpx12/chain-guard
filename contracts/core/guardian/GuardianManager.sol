@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "../Account.sol";
 import "../../interfaces/ISignatureValidator.sol";
+import "hardhat/console.sol";
 
 /* solhint-disable avoid-low-level-calls */
 /* solhint-disable no-inline-assembly */
@@ -45,6 +46,11 @@ contract GuardianManager is
         _;
     }
 
+    /**
+     * Initialize parameters of GuardianManager
+     * @param _executor the address of the GuardianExecutor
+     * @param _account the account address that this contract is managing
+     */
     function initialize(
         address _executor,
         Account _account
@@ -54,6 +60,11 @@ contract GuardianManager is
         owner = account.owner();
     }
 
+    /**
+     * Initial set up for guardians and threshold
+     * @param _guardians the list of guardian's address
+     * @param _threshold the minimum number of signature required to change owner
+     */
     function setupGuardians(
         address[] memory _guardians,
         uint256 _threshold
@@ -142,20 +153,26 @@ contract GuardianManager is
         emit GuardianRemoved(_guardian);
     }
 
+    /**
+     * change the owner of the current account that this guardian is managing
+     * @param dataHash the preimage hash of the calldata
+     * @param data the address of new owner
+     * @param signatures the signature of the guardians over data
+     */
     function changeOwner(
-        address newOwner,
         bytes32 dataHash,
         bytes memory data,
         bytes memory signatures
-    ) public onlyGuardian {
+    ) public payable onlyGuardian {
         require(
-            checkSignatures(dataHash, data, signatures),
+            checkMultisig(dataHash, data, signatures),
             "GuardianManager:: changeOwner: invalid multi sig"
         );
-        account.changeOwner(newOwner);
+        account.changeOwner(address(uint160(bytes20(data))));
+        owner = address(uint160(bytes20(data)));
     }
 
-    function checkSignatures(
+    function checkMultisig(
         bytes32 dataHash,
         bytes memory data,
         bytes memory signatures
@@ -163,12 +180,12 @@ contract GuardianManager is
         uint256 _threshold = threshold;
         require(
             _threshold > 0,
-            "GuardianManager:: checkSignature: invalid signatures"
+            "GuardianManager:: checkMultisig: invalid threshold"
         );
-        return checkNSignatures(dataHash, data, signatures, threshold);
+        return checkSignatures(dataHash, data, signatures, threshold);
     }
 
-    function checkNSignatures(
+    function checkSignatures(
         bytes32 dataHash,
         bytes memory data,
         bytes memory signatures,
@@ -176,7 +193,7 @@ contract GuardianManager is
     ) public view returns (bool) {
         require(
             signatures.length >= requiredSignatures * 65,
-            "GuardianManager:: checkNSignatures: invalid signature length"
+            "GuardianManager:: checkSignatures: invalid signature length"
         );
         uint256 signatureCount = 0;
         address currentGuardian;
@@ -187,7 +204,10 @@ contract GuardianManager is
         for (i = 0; i < requiredSignatures; i++) {
             (v, r, s) = signatureSplit(signatures, i);
             if (v == 0) {
-                require(keccak256(data) == dataHash, "GS027");
+                require(
+                    keccak256(data) == dataHash,
+                    "GuardianManager:: checkSignatures: datahash and hash of the pre-image data do not match."
+                );
                 // If v is 0 then it is a contract signature
                 // When handling contract signatures the address of the contract is encoded into r
                 currentGuardian = address(uint160(uint256(r)));
@@ -195,10 +215,16 @@ contract GuardianManager is
                 // Check that signature data pointer (s) is not pointing inside the static part of the signatures bytes
                 // This check is not completely accurate, since it is possible that more signatures than the threshold are send.
                 // Here we only check that the pointer is not pointing inside the part that is being processed
-                require(uint256(s) >= requiredSignatures * 65, "GS021");
+                require(
+                    uint256(s) >= requiredSignatures * 65,
+                    "GuardianManager:: checkSignatures: invalid contract signature location: inside static part"
+                );
 
                 // Check that signature data pointer (s) is in bounds (points to the length of data -> 32 bytes)
-                require(uint256(s) + 32 <= signatures.length, "GS022");
+                require(
+                    uint256(s) + 32 <= signatures.length,
+                    "GuardianManager:: checkSignatures: invalid contract signature location: length not present"
+                );
 
                 // Check if the contract signature is in bounds: start of data is s + 32 and end is start + signature length
                 uint256 contractSignatureLen;
@@ -208,7 +234,7 @@ contract GuardianManager is
                 }
                 require(
                     uint256(s) + 32 + contractSignatureLen <= signatures.length,
-                    "GS023"
+                    "GuardianManager:: checkSignatures: invalid contract signature location: data not complete"
                 );
 
                 // Check signature
@@ -223,7 +249,7 @@ contract GuardianManager is
                         data,
                         contractSignature
                     ) == EIP1271_MAGIC_VALUE,
-                    "GS024"
+                    "GuardianManager:: checkSignatures: invalid contract signature provided"
                 );
             }
             // else if (v == 1) {

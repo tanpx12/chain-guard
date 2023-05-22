@@ -27,14 +27,16 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
     //explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
-    address public guardianManger;
+    address public guardianManager;
 
     IEntryPoint private immutable _entryPoint;
 
-    event SimpleAccountInitialized(
+    event AccountInitialized(
         IEntryPoint indexed entryPoint,
         address indexed owner
     );
+
+    event GuardianInitialized(address indexed guardian);
 
     event OwnerChanged(address indexed newOwner);
 
@@ -68,18 +70,18 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         //directly from EOA owner, or through the account itself (which gets redirected through execute())
         require(
             msg.sender == owner || msg.sender == address(this),
-            "only owner"
+            "Account:: _onlyOwner: only owner"
         );
     }
 
     function _onlyGuardianManager() internal view {
         require(
-            guardianManger != address(0),
+            guardianManager != address(0),
             "Account::_onlyGuardianManager: guardian not setup yet"
         );
         require(
-            msg.sender == guardianManger,
-            "Account::_onlyGuardianManager: only guardian manager"
+            msg.sender == guardianManager,
+            "Account:: _onlyGuardianManager: only guardian manager"
         );
     }
 
@@ -121,16 +123,25 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         _initialize(anOwner);
     }
 
+    function setUpGuardian(address _guardianManager) public onlyOwner {
+        require(
+            guardianManager == address(0),
+            "Account:: setupGuardian: guardianManager has been setup"
+        );
+        guardianManager = _guardianManager;
+        emit GuardianInitialized(_guardianManager);
+    }
+
     function _initialize(address anOwner) internal virtual {
         owner = anOwner;
-        emit SimpleAccountInitialized(_entryPoint, owner);
+        emit AccountInitialized(_entryPoint, owner);
     }
 
     // Require the function call went through EntryPoint or owner
     function _requireFromEntryPointOrOwner() internal view {
         require(
             msg.sender == address(entryPoint()) || msg.sender == owner,
-            "account: not Owner or EntryPoint"
+            "Account:: _requireFromEntryPointOrOwner : not Owner or EntryPoint"
         );
     }
 
@@ -138,7 +149,10 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
     function _validateAndUpdateNonce(
         UserOperation calldata userOp
     ) internal override {
-        require(_nonce++ == userOp.nonce, "account: invalid nonce");
+        require(
+            _nonce++ == userOp.nonce,
+            "Account:: _validateAndUpdateNonce : invalid nonce"
+        );
     }
 
     /// implement template method of BaseAccount

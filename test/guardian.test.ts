@@ -14,8 +14,9 @@ import {
 import { fillAndSign } from "./utils/UserOp";
 import { createAccountOwner, fund } from "./utils/testUtils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumberish, BytesLike, Wallet } from "ethers";
+import { BigNumber, BigNumberish, BytesLike, Wallet } from "ethers";
 import { before } from "mocha";
+import { hexConcat, keccak256 } from "ethers/lib/utils";
 
 describe("Guardian test", async () => {
   const ethersSigner = ethers.provider.getSigner();
@@ -60,6 +61,7 @@ describe("Guardian test", async () => {
 
     await fund(accountOwner.address, "5");
     await fund(account.address, "5");
+    await fund(guardian1.address, "5");
     // await fund(guardianExecutor.address, "5");
     // await fund(guardianManager.address, "5");
   });
@@ -69,7 +71,7 @@ describe("Guardian test", async () => {
     await guardianManager.initialize(guardianExecutor.address, account.address);
     expect(await guardianManager.owner()).to.be.eq(accountOwner.address);
     expect(await guardianManager.account()).to.be.eq(account.address);
-    expect(await guardianExecutor.owner()).to.be.eq(account.address);
+    expect(await guardianExecutor.account()).to.be.eq(account.address);
   });
 
   it("Should setup guardians", async () => {
@@ -117,7 +119,9 @@ describe("Guardian test", async () => {
     let eta: BigNumberish;
 
     before(async () => {
-      eta = Math.floor((Date.now() + 7000) / 1000);
+      const blockNumber = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNumber);
+      eta = block.timestamp + 2;
       setThresholdCalldata0 = await guardianManager.populateTransaction
         .setThershold(3)
         .then((tx) => tx.data!);
@@ -182,7 +186,7 @@ describe("Guardian test", async () => {
     });
 
     it("Should execute transaction", async () => {
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 1000));
       const execCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", setThresholdCalldata0, eta)
         .then((tx) => tx.data!);
@@ -251,8 +255,9 @@ describe("Guardian test", async () => {
     });
 
     it("should set threshold", async () => {
-      eta = Math.floor((Date.now() + 10000) / 1000);
-      // console.log("initial threshold: ", await guardianManager.threshold());
+      const blockNumber = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNumber);
+      eta = block.timestamp + 1;
       // queue setThreshold() call
       const queueCalldata = await guardianExecutor.populateTransaction
         .queue(guardianManager.address, 0, "", setThresholdCalldata, eta)
@@ -274,7 +279,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute setThreshold() call
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 1000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", setThresholdCalldata, eta)
         .then((tx) => tx.data!);
@@ -303,7 +308,9 @@ describe("Guardian test", async () => {
 
     it("should add guardian", async () => {
       // queue addGuardian() call
-      eta = Math.floor((Date.now() + 10000) / 1000);
+      const blockNumber = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNumber);
+      eta = block.timestamp + 1;
       const queueCalldata = await guardianExecutor.populateTransaction
         .queue(guardianManager.address, 0, "", addGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -325,7 +332,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute addGuardian() call
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 1000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", addGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -354,7 +361,10 @@ describe("Guardian test", async () => {
     });
     it("should remove guardian", async () => {
       // queue removeGuardian() call
-      eta = Math.floor((Date.now() + 10000) / 1000);
+      const blockNumber = await ethers.provider.getBlockNumber();
+      const block = await ethers.provider.getBlock(blockNumber);
+      eta = block.timestamp + 1;
+
       const queueCalldata = await guardianExecutor.populateTransaction
         .queue(guardianManager.address, 0, "", removeGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -376,7 +386,7 @@ describe("Guardian test", async () => {
         .handleOps([queueUserOp], guardian1.address, { gasLimit: 1000000 });
 
       // execute removeGuardian() call
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 1000));
       const executeCalldata = await guardianExecutor.populateTransaction
         .execute(guardianManager.address, 0, "", removeGuardianCalldata, eta)
         .then((tx) => tx.data!);
@@ -404,8 +414,45 @@ describe("Guardian test", async () => {
       expect(await guardianManager.guardianCount()).to.be.eq(3);
     });
 
-    it("should verify multisig", async () => {});
+    it("should verify signatures", async () => {
+      const calldata = "0x00";
+      const dataHash = ethers.utils.hashMessage(calldata);
+      const guardians = [guardian1, guardian2, guardian4];
+      guardians.sort((a, b) =>
+        BigNumber.from(a.address).lt(BigNumber.from(b.address)) ? -1 : 1
+      );
+      const sigs = await Promise.all(
+        guardians.map(async (w) => await w.signMessage(calldata))
+      );
+      const signature = hexConcat(sigs);
+      expect(
+        await guardianManager.checkSignatures(dataHash, calldata, signature, 3)
+      ).to.be.true;
+    });
 
-    it("should change owner", async () => {});
+    it("should change owner", async () => {
+      await account
+        .connect(accountOwner)
+        .setUpGuardian(guardianManager.address);
+      const newOwner = createAccountOwner();
+
+      const dataHash = ethers.utils.hashMessage(newOwner.address);
+      const guardians = [guardian1, guardian2, guardian4];
+      guardians.sort((a, b) =>
+        BigNumber.from(a.address).lt(BigNumber.from(b.address)) ? -1 : 1
+      );
+      const sigs = await Promise.all(
+        guardians.map(async (w) => await w.signMessage(newOwner.address))
+      );
+      const signatures = hexConcat(sigs);
+      await guardianManager
+        .connect(guardian1)
+        .changeOwner(dataHash, newOwner.address, signatures, {
+          value: ethers.utils.parseEther("0.1"),
+          gasLimit: 1000000,
+        });
+      expect(await account.owner()).to.be.eq(newOwner.address);
+      expect(await guardianManager.owner()).to.be.eq(newOwner.address);
+    });
   });
 });

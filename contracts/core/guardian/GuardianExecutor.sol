@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
  * @notice
  */
 contract GuardianExecutor is Initializable, UUPSUpgradeable {
-    address public owner;
+    address public account;
     uint256 private delay;
     uint256 private expirePeriod;
 
@@ -43,22 +43,22 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     );
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == account, "only owner");
         _;
     }
 
     /**
      * Initialize parameter of GuardianExecutor contract
-     * @param _owner the owner of the account that this Guardian is protected
+     * @param _account the account address that this Guardian is protected
      * @param _delay the time delay require for a transaction request to mature
      * @param _expirePeriod the time period after eta that user could execute the transaction through GuardianExecutor
      */
     function initialize(
-        address _owner,
+        address _account,
         uint256 _delay,
         uint256 _expirePeriod
     ) public initializer {
-        owner = _owner;
+        account = _account;
         delay = _delay;
         expirePeriod = _expirePeriod;
     }
@@ -69,7 +69,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
 
     /**
      * Queue the transaction that owner wish to execute
-     * @param _target the target contract that going to be call
+     * @param _target the target contract that's going to be call
      * @param _value the value of the call
      * @param _signature the function signature
      * @param _data calldata of the call
@@ -84,7 +84,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
     ) external onlyOwner returns (bytes32) {
         require(
             _eta >= block.timestamp + delay,
-            "Timelock::queue: Estimated execution block must satisfy delay."
+            "Timelock:: queue: Estimated execution block must satisfy delay."
         );
 
         bytes32 txHash = keccak256(
@@ -124,17 +124,17 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
 
         require(
             transactionQueue[txHash],
-            "Timelock::execute: Transaction hasn't been queued."
+            "Timelock:: execute: Transaction hasn't been queued."
         );
 
         require(
             block.timestamp >= _eta,
-            "Timelock::execute: Transaction hasn't surpassed time lock."
+            "Timelock:: execute: Transaction hasn't surpassed time lock."
         );
 
         require(
             block.timestamp <= (_eta + expirePeriod),
-            "Timelock::execute: Transaction is expired."
+            "Timelock:: execute: Transaction is expired."
         );
 
         transactionQueue[txHash] = false;
@@ -152,7 +152,7 @@ contract GuardianExecutor is Initializable, UUPSUpgradeable {
 
         (bool success, ) = _target.call{value: _value}(callData);
 
-        require(success, "Timelock::execute: Transaction execution reverted.");
+        require(success, "Timelock:: execute: Transaction execution reverted.");
         emit TransactionExecuted(
             txHash,
             _target,
