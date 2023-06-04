@@ -1,5 +1,7 @@
 pragma solidity ^0.8.12;
 
+import {calldataKeccak} from "../core/Helpers.sol";
+
 /**
  * User operation struct
  * @param sender the address of the account sends this request
@@ -16,73 +18,85 @@ pragma solidity ^0.8.12;
  */
 
 struct UserOperation {
-  address sender;
-  uint256 nonce;
-  bytes initCode;
-  bytes callData;
-  uint256 callGasLimit;
-  uint256 verificationGasLimit;
-  uint256 preVerificationGas;
-  uint256 maxFeePerGas;
-  uint256 maxPriorityFeePerGas;
-  bytes paymasterAndData;
-  bytes signature;
+    address sender;
+    uint256 nonce;
+    bytes initCode;
+    bytes callData;
+    uint256 callGasLimit;
+    uint256 verificationGasLimit;
+    uint256 preVerificationGas;
+    uint256 maxFeePerGas;
+    uint256 maxPriorityFeePerGas;
+    bytes paymasterAndData;
+    bytes signature;
 }
 
 /**
  * Utility functions helpful when working with UserOperation structs.
  */
 library UserOperationLib {
-  function getSender(
-    UserOperation calldata userOp
-  ) internal pure returns (address) {
-    address data;
-    assembly {
-      //read sender from userOp, which is first userOp member (saves 800 gas...)
-      data := calldataload(userOp)
+    function getSender(
+        UserOperation calldata userOp
+    ) internal pure returns (address) {
+        address data;
+        assembly {
+            //read sender from userOp, which is first userOp member (saves 800 gas...)
+            data := calldataload(userOp)
+        }
+        return address(uint160(data));
     }
-    return address(uint160(data));
-  }
 
-  // relayer/block builder might submit the tx with higher priorityFee,
-  // but the user should not pay above what he signed for
-  function gasPrice(
-    UserOperation calldata userOp
-  ) internal view returns (uint256) {
-    unchecked {
-      uint256 maxFeePerGas = userOp.maxFeePerGas;
-      uint256 maxPriorityFeePerGas = userOp.maxPriorityFeePerGas;
-      if (maxFeePerGas == maxPriorityFeePerGas) {
-        return maxFeePerGas;
-      }
-      return min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
+    // relayer/block builder might submit the tx with higher priorityFee,
+    // but the user should not pay above what he signed for
+    function gasPrice(
+        UserOperation calldata userOp
+    ) internal view returns (uint256) {
+        unchecked {
+            uint256 maxFeePerGas = userOp.maxFeePerGas;
+            uint256 maxPriorityFeePerGas = userOp.maxPriorityFeePerGas;
+            if (maxFeePerGas == maxPriorityFeePerGas) {
+                return maxFeePerGas;
+            }
+            return min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
+        }
     }
-  }
 
-  function pack(
-    UserOperation calldata userOp
-  ) internal pure returns (bytes memory ret) {
-    //lighter signature scheme. must match UserOp.ts#packUserOp
-    bytes calldata sig = userOp.signature;
+    function pack(
+        UserOperation calldata userOp
+    ) internal pure returns (bytes memory ret) {
+        address sender = getSender(userOp);
+        uint256 nonce = userOp.nonce;
+        bytes32 hashInitCode = calldataKeccak(userOp.initCode);
+        bytes32 hashCallData = calldataKeccak(userOp.callData);
+        uint256 callGasLimit = userOp.callGasLimit;
+        uint256 verificationGasLimit = userOp.verificationGasLimit;
+        uint256 preVerificationGas = userOp.preVerificationGas;
+        uint256 maxFeePerGas = userOp.maxFeePerGas;
+        uint256 maxPriorityFeePerGas = userOp.maxPriorityFeePerGas;
+        bytes32 hashPaymasterAndData = calldataKeccak(userOp.paymasterAndData);
 
-    // copy directly the userOp from calldata up to (but not including) the signature.
-    // this encoding depends on the ABI encoding of calldata, but is much lighter to copy
-    // than referencing each field separately.
-    assembly {
-      let ofs := userOp
-      let len := sub(sub(sig.offset, ofs), 32)
-      ret := mload(0x40)
-      mstore(0x40, add(ret, add(len, 32)))
-      mstore(ret, len)
-      calldatacopy(add(ret, 32), ofs, len)
+        return
+            abi.encode(
+                sender,
+                nonce,
+                hashInitCode,
+                hashCallData,
+                callGasLimit,
+                verificationGasLimit,
+                preVerificationGas,
+                maxFeePerGas,
+                maxPriorityFeePerGas,
+                hashPaymasterAndData
+            );
     }
-  }
 
-  function hash(UserOperation calldata userOp) internal pure returns (bytes32) {
-    return keccak256(pack(userOp));
-  }
+    function hash(
+        UserOperation calldata userOp
+    ) internal pure returns (bytes32) {
+        return keccak256(pack(userOp));
+    }
 
-  function min(uint256 a, uint256 b) internal pure returns (uint256) {
-    return a < b ? a : b;
-  }
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
 }
