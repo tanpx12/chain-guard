@@ -51,7 +51,9 @@ describe("Account Test", function () {
       account
         .connect(ethers.provider.getSigner(1))
         .execute(accounts[2], ETH_1, "0x")
-    ).to.be.revertedWith("account: not Owner or EntryPoint");
+    ).to.be.revertedWith(
+      "Account:: _requireFromEntryPointOrOwner : not Owner or EntryPoint"
+    );
   });
 
   describe("#validateUserOp", async () => {

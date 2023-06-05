@@ -28,6 +28,7 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
     uint96 private _nonce;
     address public owner;
     address public guardianManager;
+    address public guardianExecutor;
 
     IEntryPoint private immutable _entryPoint;
 
@@ -123,12 +124,16 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
         _initialize(anOwner);
     }
 
-    function setUpGuardian(address _guardianManager) public onlyOwner {
+    function setUpGuardian(
+        address _guardianManager,
+        address _guardianExecutor
+    ) public onlyOwner {
         require(
             guardianManager == address(0),
             "Account:: setupGuardian: guardianManager has been setup"
         );
         guardianManager = _guardianManager;
+        guardianExecutor = _guardianExecutor;
         emit GuardianInitialized(_guardianManager);
     }
 

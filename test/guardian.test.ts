@@ -433,7 +433,7 @@ describe("Guardian test", async () => {
     it("should change owner", async () => {
       await account
         .connect(accountOwner)
-        .setUpGuardian(guardianManager.address);
+        .setUpGuardian(guardianManager.address, guardianExecutor.address);
       const newOwner = createAccountOwner();
 
       const dataHash = ethers.utils.hashMessage(newOwner.address);
