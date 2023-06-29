@@ -33,6 +33,7 @@ describe("Account Test", function () {
       accounts[0],
       entryPoint
     );
+    console.log(await account.nonce());
     await ethersSigner.sendTransaction({
       from: accounts[0],
       to: account.address,
@@ -116,19 +117,19 @@ describe("Account Test", function () {
     });
 
     it("should increment nonce", async () => {
-      expect(await account.nonce()).to.eq(1);
+      expect(await account.nonce()).to.eq(2);
     });
 
     it("should reject same tx on nonce error", async () => {
       await expect(
         account.validateUserOp(userOp, userOpHash, 0)
-      ).to.revertedWith("invalid nonce");
+      ).to.revertedWith("Account:: _validateAndUpdateNonce : invalid nonce");
     });
 
     it("should return NO_SIG_VALIDATION on wrong signature", async () => {
       const userOpHash = HashZero;
       const deadline = await account.callStatic.validateUserOp(
-        { ...userOp, nonce: 1 },
+        { ...userOp, nonce: 2 },
         userOpHash,
         0
       );

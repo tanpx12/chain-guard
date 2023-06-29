@@ -1,6 +1,1 @@
-export const deployedAddresses = {
-  accountFactoryAddr: "0x25D1CdbB5af19d0f2D622818597e6D83C767FB6E",
-  paymasterAddr: "0xE6F5902cEC125B495d473eE7ab0320a658D48564",
-  oracleAddr: "0xBe6Ad989eBe5Cdbf55986Ead24B4Aa5E63AB4522",
-  tokenAddr: "0xE31B99163eE0344f168A1BaEad5804A2A03C6D38",
-};
+export const deployedAddresses ={"accountFactoryAddr":"0x397559AEc4C800F5D1223431c818b83D585AD9ba","paymasterAddr":"0x85047eBC2698c42329adE0C9B8EFd07b639BcBCa","oracleAddr":"0x44Da57289410D293E39fbd6eeb8832D7f51955C9","tokenAddr":"0x211B4A384eEcDEe52a97fd9Bc1bA6308769f09cD"}

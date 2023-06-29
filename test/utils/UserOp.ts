@@ -210,7 +210,7 @@ export function getUserOpHash(
 
 export const DefaultsForUserOp: UserOperation = {
   sender: AddressZero,
-  nonce: 0,
+  nonce: 1,
   initCode: "0x",
   callData: "0x",
   callGasLimit: 0,

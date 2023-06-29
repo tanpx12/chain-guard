@@ -122,6 +122,7 @@ contract Account is BaseAccount, UUPSUpgradeable, Initializable {
      */
     function initialize(address anOwner) public virtual initializer {
         _initialize(anOwner);
+        _nonce = 1;
     }
 
     function setUpGuardian(
